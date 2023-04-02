@@ -4,3 +4,4 @@
 **/landmark_figs
 **/.DS_Store
 **/fingertip_keyboard_input/mnist_model/data/*
+**/fingertip_keyboard_input/emnist_model/data/*

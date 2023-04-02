@@ -47,10 +47,10 @@ class CNN_SRM(NetRelu): # CNN implementation inspired by SRM paper for emnist ex
             nn.ReLU(),
             nn.BatchNorm2d(128),
             nn.Flatten(),
-            nn.Linear(128, 47),
+            nn.Linear(128, 26),
             nn.Dropout(0.4),
             nn.Softmax(dim = 1))
-        self.name = 'CNN_SRM'
+        self.name = 'CNN_SRM_letter'
         print('created model: ', self.name)
 
 class NetReluShallow(NetRelu): # shallow model that allows self define size

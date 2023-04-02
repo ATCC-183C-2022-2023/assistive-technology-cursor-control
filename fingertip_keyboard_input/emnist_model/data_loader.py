@@ -26,7 +26,7 @@ def load_emnist_data(train_noise = False, validation_noise = False):
             AddGaussianNoise()
         ])
 
-    train_data = dsets.EMNIST(root='./data', train=True, download=True, transform=train_transform, split = 'balanced')
+    train_data = dsets.EMNIST(root='./data', train=True, download=True, transform=train_transform, split = 'letters')
 
     validation_transform = transforms.ToTensor()
     if validation_noise:
@@ -35,9 +35,9 @@ def load_emnist_data(train_noise = False, validation_noise = False):
             AddGaussianNoise()
         ])
 
-    validation_data = dsets.EMNIST(root='./data', train=False, download=True, transform=validation_transform, split = 'balanced')
-    plt.imshow(validation_data[0][0][0])
-    plt.show()
+    validation_data = dsets.EMNIST(root='./data', train=False, download=True, transform=validation_transform, split = 'letters')
+    # plt.imshow(validation_data[0][0][0])
+    # plt.show()
 
     return train_data, validation_data
 

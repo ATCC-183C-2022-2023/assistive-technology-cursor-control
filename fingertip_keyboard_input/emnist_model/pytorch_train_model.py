@@ -32,8 +32,8 @@ def train(model, save_dir, epochs = 10, learning_rate = 0.05,
         train_correct = 0
         for (x, y) in tqdm(train_loader):
             optimizer.zero_grad()
-            # print(x.shape)
             x = x.to(DEVICE)
+            y = torch.sub(y, 1) # in EMNIST-letter split, y is labeled from 1-26, so we subtract 1 to make 0-25
             y = y.to(DEVICE)
             z = model(x)
             _, label = torch.max(z, 1)
@@ -42,7 +42,6 @@ def train(model, save_dir, epochs = 10, learning_rate = 0.05,
             loss.backward()
             optimizer.step()
             useful_stuff['training_loss'].append(loss.data.item())
-            
 
         train_accuracy = 100 * (train_correct / len(train_data))
         useful_stuff['train_accuracy'].append(train_accuracy)
@@ -51,6 +50,7 @@ def train(model, save_dir, epochs = 10, learning_rate = 0.05,
         validation_correct = 0
         for x, y in tqdm(validation_loader):
             x = x.to(DEVICE)
+            y = torch.sub(y, 1)  # in EMNIST-letter split, y is labeled from 1-26, so we subtract 1 to make 0-25
             y = y.to(DEVICE)
             z = model(x)
             _, label = torch.max(z, 1)

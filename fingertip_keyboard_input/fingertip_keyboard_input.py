@@ -12,13 +12,14 @@ import time
 from pynput.keyboard import Key, Controller
 
 sys.path.insert(0, '../two_handed_gestures/gesture_mapping')
-sys.path.insert(1, './emnist_model/')
 
 import alignment as alignment
 import util
 import torch
-import pytorch_model_class
-from pytorch_model_class import DEVICE
+import mnist_model.pytorch_model_class
+import emnist_model.pytorch_model_class
+from emnist_model.pytorch_model_class import DEVICE
+
 
 def draw_path(image, points, color=((0, 255, 0)), thickness=10):
     for i in range(0, len(points) - 1):
@@ -195,27 +196,30 @@ backspace_available = False
 
 drawn_image = None
 
-# Set the parameters and create the model
-D_in = 28 * 28
-H1 = 100
-H2 = 100
-D_out = 10
-
 # load ML classification model
-model = pytorch_model_class.CNN_SRM().to(DEVICE)
-model.load_model(path = './emnist_model/saved_models')
+digit_model = mnist_model.pytorch_model_class.NetReluShallow(D_in=28 * 28, H1=100, H2=100, D_out=10)
+digit_model.load_model(path = './mnist_model/saved_models')
+
+char_model = emnist_model.pytorch_model_class.CNN_SRM().to(DEVICE)
+char_model.load_model(path = './emnist_model/saved_models')
+
+# mapping from model outputs to digits / characters
+# digit mapping based on mnist dataset
+digit_map = {
+    0: '0',  1: '1',  2: '2',  3: '3',  4: '4',  5: '5',  6: '6',  7: '7',  8: '8', 9: '9'
+}
+
+char_map = {
+    0: 'A', 1: 'B', 2: 'C', 3: 'D', 4: 'E', 5: 'F', 6: 'G', 7: 'H', 8: 'I',
+    9: 'J', 10: 'K', 11: 'L', 12: 'M', 13: 'N', 14: 'O', 15: 'P', 16: 'Q', 17: 'R',
+    18: 'S', 19: 'T', 20: 'U', 21: 'V', 22: 'W', 23: 'X', 24: 'Y', 25: 'Z'
+}
+
+# we use char recognition by default
+input_mode = 1 # 1 for char, -1 for digit
 
 # keyboard setup
 keyboard = Controller()
-
-# mapping of characters to digits
-# mapping based on https://arxiv.org/pdf/1702.05373.pdf, balanced dataset
-char_map = { 0: '0',  1: '1',  2: '2',  3: '3',  4: '4',  5: '5',  6: '6',  7: '7',  8: '8', 9: '9',
-            10: 'A', 11: 'B', 12: 'C', 13: 'D', 14: 'E', 15: 'F', 16: 'G', 17: 'H', 18: 'I',
-            19: 'J', 20: 'K', 21: 'L', 22: 'M', 23: 'N', 24: 'O', 25: 'P', 26: 'Q', 27: 'R',
-            28: 'S', 29: 'T', 30: 'U', 31: 'V', 32: 'W', 33: 'X', 34: 'Y', 35: 'Z', 
-            36: 'a', 37: 'b', 38: 'd', 39: 'e', 40: 'f', 41: 'g', 42: 'h', 43: 'n', 44: 'q',
-            45: 'r', 46: 't'}
 
 #variables to keep track of confidence selection
 choice1 = None
@@ -271,6 +275,17 @@ while cap.isOpened():
             cv2.putText(image, 'pose: ' + category, (10, image_height - 50),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (209, 80, 0, 255), 3)
 
+            # detect and switch input mode using left hand 4
+            if handedness == "Left" and category == "four" and prev_left_gesture != 'four':
+                input_mode *= -1
+
+            if input_mode == 1:
+                cv2.putText(image, 'input mode: char', (10, image_height - 80),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (209, 80, 0, 255), 3)
+            else:
+                cv2.putText(image, 'input mode: digit', (10, image_height - 80),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (209, 80, 0, 255), 3)
+
             #if we are NOT in confidence selection stage, then right hand is enabled.
             if handedness == 'Right' and choice1 == None and choice2 == None:
                 # if right hand is pose 'one', append fingertip path
@@ -288,10 +303,18 @@ while cap.isOpened():
                     drawn_path_resized = crop_and_draw_path(drawn_image, fingertip_path_right)
 
                     if drawn_path_resized is not None:
-                        tensor_input_image_reshaped = drawn_path_resized.T.reshape((1, 1, 28, 28))
-                        tensor_input_image = torch.from_numpy(tensor_input_image_reshaped) / 255
-                        character_confidences = model(tensor_input_image.to(DEVICE))
+                        # get the correct model with respect to the input_mode
+                        if input_mode == 1:
+                            active_model = char_model
+                            active_map = char_map
+                            tensor_input_image_reshaped = drawn_path_resized.T.reshape((1, 1, 28, 28))
+                        else:
+                            active_model = digit_model
+                            active_map = digit_map
+                            tensor_input_image_reshaped = drawn_path_resized.reshape((-1, 28*28))
 
+                        tensor_input_image = torch.from_numpy(tensor_input_image_reshaped) / 255
+                        character_confidences = active_model(tensor_input_image.to(DEVICE))
                         _, label = torch.max(character_confidences, axis=1)
 
                         top2 = torch.topk(character_confidences, 2).indices.tolist()[0]
@@ -299,18 +322,18 @@ while cap.isOpened():
 
                         #If the top two probabilities are above a threshold, enter confidence selection stage
                         if probs[0] >= 0.2 and probs[1] >= 0.2: #thresholds can be tuned.
-                            choice1 = char_map[int(top2[0])]
-                            choice2 = char_map[int(top2[1])]
+                            choice1 = active_map[int(top2[0])]
+                            choice2 = active_map[int(top2[1])]
                             print("CONFIDENCE SELECTION: " + "\n")
-                            print(f'Top Choice 1: {char_map[int(top2[0])]} with probability {probs[0]}')
-                            print(f'Top Choice 2: {char_map[int(top2[1])]} with probability {probs[1]}')
+                            print(f'Top Choice 1: {active_map[int(top2[0])]} with probability {probs[0]}')
+                            print(f'Top Choice 2: {active_map[int(top2[1])]} with probability {probs[1]}')
 
                         else:
                             #otherwise, just select top character normally
-                            print(f'Recognized character: {char_map[int(label)]}')
+                            print(f'Recognized character: {active_map[int(label)]}')
 
-                            keyboard.press(char_map[int(label)])
-                            keyboard.release(char_map[int(label)])
+                            keyboard.press(active_map[int(label)])
+                            keyboard.release(active_map[int(label)])
 
                     # reset path
                     fingertip_path_right = []

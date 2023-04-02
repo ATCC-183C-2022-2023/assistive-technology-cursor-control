@@ -15,6 +15,7 @@ def eval(model, train_noise = False, validation_noise = False):
     train_correct = 0
     for x, y in tqdm(train_loader):
         x = x.to(DEVICE)
+        y = torch.sub(y, 1)  # in EMNIST-letter split, y is labeled from 1-26, so we subtract 1 to make 0-25
         y = y.to(DEVICE)
         z = model(x)
         _, label = torch.max(z, 1)
@@ -26,6 +27,7 @@ def eval(model, train_noise = False, validation_noise = False):
     validation_correct = 0
     for x, y in validation_loader:
         x = x.to(DEVICE)
+        y = torch.sub(y, 1)  # in EMNIST-letter split, y is labeled from 1-26, so we subtract 1 to make 0-25
         y = y.to(DEVICE)
         z = model(x)
         _, label = torch.max(z, 1)
