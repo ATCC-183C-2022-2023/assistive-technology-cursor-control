@@ -1,6 +1,9 @@
 # Fingertip Keyboard Input
 A computer application that allows keyboard input by drawing letters in the air, captured by a web camera.
 
+## Packaging
+In this directory, running `./package-silicon.sh` should run a shell script that generates a `./dist/` directory, containing an executable file. This *should* work for any platform, but the silicon executable is linked [here](https://drive.google.com/drive/folders/1UxUL7yxoezTOjp6rEXTtZxnflMzyxFJ_?usp=sharing) as an example.
+
 ## How to Run
 From this directory, install packages using `pip install -r ../requirements.txt`
 Within the `fingertip_keyboard_input` directory, run `python mouse_and_keyboard_control.py`
